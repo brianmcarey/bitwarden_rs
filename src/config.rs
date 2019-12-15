@@ -29,6 +29,7 @@ macro_rules! make_config {
         pub struct Config { inner: RwLock<Inner> }
 
         struct Inner {
+            shutdown_handle: Option<rocket::shutdown::ShutdownHandle>,
             templates: Handlebars<'static>,
             config: ConfigItems,
 
@@ -466,7 +467,13 @@ impl Config {
         validate_config(&config)?;
 
         Ok(Config {
-            inner: RwLock::new(Inner { templates: load_templates(&config.templates_folder), config, _env, _usr }),
+            inner: RwLock::new(Inner {
+                templates: load_templates(&config.templates_folder),
+                shutdown_handle: None,
+                config,
+                _env,
+                _usr,
+            }),
         })
     }
 
@@ -589,6 +596,14 @@ impl Config {
             let hb = &CONFIG.inner.read().unwrap().templates;
             hb.render(name, data).map_err(Into::into)
         }
+    }
+
+    pub fn set_shutdown_handle(&self, handle: rocket::shutdown::ShutdownHandle) {
+        self.inner.write().unwrap().shutdown_handle = Some(handle);
+    }
+
+    pub fn shutdown(&self) {
+        self.inner.read().unwrap().shutdown_handle.clone().map(|s| s.shutdown());
     }
 }
 

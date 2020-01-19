@@ -2830,19 +2830,18 @@ checksum = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 [[package]]
 name = "u2f"
 version = "0.2.0"
-source = "git+https://github.com/dani-garcia/u2f-rs?rev=8efe11d67666eb727f960733c909923c88e62c2e#8efe11d67666eb727f960733c909923c88e62c2e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f285392366190c4d46823458f4543ac0f35174759c78e80c5baa39e1f7aa4f"
 dependencies = [
  "base64 0.11.0",
  "byteorder",
  "bytes 0.4.12",
  "chrono",
- "ring",
+ "openssl",
  "serde",
  "serde_derive",
  "serde_json",
  "time 0.1.42",
- "untrusted",
- "webpki",
 ]
 
 [[package]]
@@ -3224,8 +3223,3 @@ dependencies = [
  "threadpool",
  "url 1.7.2",
 ]
-
-[[patch.unused]]
-name = "jsonwebtoken"
-version = "7.0.0"
-source = "git+https://github.com/Keats/jsonwebtoken?rev=639915f25b4b0457106f2a8a04249ab2758900c6#639915f25b4b0457106f2a8a04249ab2758900c6"

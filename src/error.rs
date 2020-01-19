@@ -47,6 +47,7 @@ use std::time::SystemTimeError as TimeErr;
 use u2f::u2ferror::U2fError as U2fErr;
 use yubico::yubicoerror::YubicoError as YubiErr;
 use lettre::smtp::error::Error as LettreErr;
+use openssl::error::ErrorStack as OpSSLErr;
 
 #[derive(Display, Serialize)]
 pub struct Empty {}
@@ -75,6 +76,7 @@ make_error! {
     RegexError(RegexErr): _has_source, _api_error,
     YubiError(YubiErr):   _has_source, _api_error,
     LetreErr(LettreErr):  _has_source, _api_error,
+    OpSSLError(OpSSLErr): _has_source, _api_error,
 }
 
 // This is implemented by hand because NoneError doesn't implement neither Display nor Error

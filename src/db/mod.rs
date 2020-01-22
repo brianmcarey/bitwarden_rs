@@ -77,11 +77,15 @@ impl<'a, 'r> FromRequestAsync<'a, 'r> for DbConn {
 
     fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
         Box::pin(async move {
-            let pool = try_outcome!(request.guard::<State<Pool>>());
-            match pool.get() {
-                Ok(conn) => Outcome::Success(DbConn(conn)),
-                Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
-            }
+            let pool = try_outcome!(request.guard::<State<Pool>>()).clone();
+            
+            // TODO: We are basically doing the same as rocket's #[database(name)] macro, maybe we should just use that?
+            tokio::task::spawn_blocking(move || {
+                match pool.get() {
+                    Ok(conn) => Outcome::Success(DbConn(conn)),
+                    Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
+                }
+            }).await.expect("failed to spawn a blocking task to get a pooled connection")
         })
     }
 }
@@ -89,6 +93,7 @@ impl<'a, 'r> FromRequestAsync<'a, 'r> for DbConn {
 // For the convenience of using an &DbConn as a &Database.
 impl Deref for DbConn {
     type Target = Connection;
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }

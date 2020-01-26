@@ -4,7 +4,7 @@
 use crate::util::read_file;
 use chrono::{Duration, Utc};
 
-use jsonwebtoken::{self, Algorithm, Header};
+use jsonwebtoken::{self, Algorithm, DecodingKey, EncodingKey, Header};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
@@ -21,14 +21,19 @@ lazy_static! {
     pub static ref JWT_DELETE_ISSUER: String = format!("{}|delete", CONFIG.domain());
     pub static ref JWT_VERIFYEMAIL_ISSUER: String = format!("{}|verifyemail", CONFIG.domain());
     pub static ref JWT_ADMIN_ISSUER: String = format!("{}|admin", CONFIG.domain());
-    static ref PRIVATE_RSA_KEY: Vec<u8> = match read_file(&CONFIG.private_rsa_key()) {
-        Ok(key) => key,
-        Err(e) => panic!("Error loading private RSA Key.\n Error: {}", e),
-    };
-    static ref PUBLIC_RSA_KEY: Vec<u8> = match read_file(&CONFIG.public_rsa_key()) {
-        Ok(key) => key,
-        Err(e) => panic!("Error loading public RSA Key.\n Error: {}", e),
-    };
+    static ref PRIVATE_RSA_KEY_CONTENT: Vec<u8> = read_file(&CONFIG.private_rsa_key())
+        .unwrap_or_else(|e| panic!("Error loading private RSA Key.\n Error: {}", e));
+    static ref PRIVATE_RSA_KEY: EncodingKey = EncodingKey::from_rsa_pem(&PRIVATE_RSA_KEY_CONTENT)
+        .unwrap_or_else(|e| panic!("Error loading private RSA Key.\n Error: {}", e));
+    static ref PUBLIC_RSA_KEY_CONTENT: Vec<u8> = read_file(&CONFIG.public_rsa_key())
+        .unwrap_or_else(|e| panic!("Error loading public RSA Key.\n Error: {}", e));
+    static ref PUBLIC_RSA_KEY: DecodingKey<'static> = DecodingKey::from_rsa_pem(&PUBLIC_RSA_KEY_CONTENT)
+        .unwrap_or_else(|e| panic!("Error loading public RSA Key.\n Error: {}", e));
+}
+
+pub fn load_keys() {
+    lazy_static::initialize(&PUBLIC_RSA_KEY);
+    lazy_static::initialize(&PRIVATE_RSA_KEY);
 }
 
 pub fn encode_jwt<T: Serialize>(claims: &T) -> String {

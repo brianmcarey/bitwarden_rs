@@ -28,11 +28,11 @@ rocket_contrib = "0.5.0-dev"
 
 # Async futures
 futures = "0.3.1"
-tokio = { version = "0.2.9", features = ["blocking", "fs", "io-util"] }
+tokio = { version = "0.2.10", features = ["blocking", "fs", "io-util"] }
 
 # HTTP client
 reqwest = { version = "0.10.1", features = ["gzip", "json", "stream"] }
-bytes = "0.5.3"
+bytes = "0.5.4"
 
 # multipart/form-data support
 multipart = { version = "0.16.1", features = ["server"], default-features = false }
@@ -78,7 +78,7 @@ oath = "0.10.2"
 data-encoding = "2.1.2"
 
 # JWT library
-jsonwebtoken = "7.0.0-alpha.2"
+jsonwebtoken = "7.0.0-beta.1"
 
 # U2F library
 u2f = "0.2.0"

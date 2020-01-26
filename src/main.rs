@@ -184,6 +184,7 @@ fn check_rsa_keys() -> Result<(), crate::error::Error> {
 
         let priv_key = rsa_key.private_key_to_pem()?;
         crate::util::write_file(&priv_path, &priv_key)?;
+        info!("Private key created correctly.");
     }
 
     if !util::file_exists(&pub_path) {
@@ -191,9 +192,10 @@ fn check_rsa_keys() -> Result<(), crate::error::Error> {
                 
         let pub_key = rsa_key.public_key_to_pem()?;
         crate::util::write_file(&pub_path, &pub_key)?;
+        info!("Public key created correctly.");
     }
-    
-    info!("Keys created correctly.");
+
+    auth::load_keys();
     Ok(())
 }
 

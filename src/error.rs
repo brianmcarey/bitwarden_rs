@@ -42,12 +42,12 @@ use reqwest::Error as ReqErr;
 use serde_json::{Error as SerdeErr, Value};
 use std::io::Error as IOErr;
 
+use lettre::smtp::error::Error as LettreErr;
+use openssl::error::ErrorStack as OpSSLErr;
 use std::option::NoneError as NoneErr;
 use std::time::SystemTimeError as TimeErr;
 use u2f::u2ferror::U2fError as U2fErr;
 use yubico::yubicoerror::YubicoError as YubiErr;
-use lettre::smtp::error::Error as LettreErr;
-use openssl::error::ErrorStack as OpSSLErr;
 
 #[derive(Display, Serialize)]
 pub struct Empty {}
@@ -183,23 +183,22 @@ use rocket::http::{ContentType, Status};
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
 
+#[rocket::async_trait]
 impl<'r> Responder<'r> for Error {
-    fn respond_to(self, _: &'r Request<'_>) -> response::ResultFuture<'r> {
-        Box::pin(async move {
-            match self.error {
-                ErrorKind::EmptyError(_) => {} // Don't print the error in this situation
-                _ => error!(target: "error", "{:#?}", self),
-            };
+    async fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'r> {
+        match self.error {
+            ErrorKind::EmptyError(_) => {} // Don't print the error in this situation
+            _ => error!(target: "error", "{:#?}", self),
+        };
 
-            let code = Status::from_code(self.error_code).unwrap_or(Status::BadRequest);
+        let code = Status::from_code(self.error_code).unwrap_or(Status::BadRequest);
 
-            Response::build()
-                .status(code)
-                .header(ContentType::JSON)
-                .sized_body(Cursor::new(format!("{}", self)))
-                .ok()
-                .await
-        })
+        Response::build()
+            .status(code)
+            .header(ContentType::JSON)
+            .sized_body(Cursor::new(format!("{}", self)))
+            .await
+            .ok()
     }
 }
 

@@ -11,6 +11,7 @@ use crate::CONFIG;
 
 pub struct AppHeaders();
 
+#[rocket::async_trait]
 impl Fairing for AppHeaders {
     fn info(&self) -> Info {
         Info {
@@ -19,25 +20,22 @@ impl Fairing for AppHeaders {
         }
     }
 
-    fn on_response<'a>(
-        &'a self,
-        _req: &'a Request<'_>,
-        res: &'a mut Response<'_>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
-        Box::pin(async move {
-            res.set_raw_header("Feature-Policy", "accelerometer 'none'; ambient-light-sensor 'none'; autoplay 'none'; camera 'none'; encrypted-media 'none'; fullscreen 'none'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; midi 'none'; payment 'none'; picture-in-picture 'none'; sync-xhr 'self' https://haveibeenpwned.com https://twofactorauth.org; usb 'none'; vr 'none'");
-            res.set_raw_header("Referrer-Policy", "same-origin");
-            res.set_raw_header("X-Frame-Options", "SAMEORIGIN");
-            res.set_raw_header("X-Content-Type-Options", "nosniff");
-            res.set_raw_header("X-XSS-Protection", "1; mode=block");
-            let csp = format!("frame-ancestors 'self' chrome-extension://nngceckbapebfimnlniiiahkandclblb moz-extension://* {};", CONFIG.allowed_iframe_ancestors());
-            res.set_raw_header("Content-Security-Policy", csp);
+    async fn on_response<'a>(&'a self, _req: &'a Request<'_>, res: &'a mut Response<'_>) {
+        res.set_raw_header("Feature-Policy", "accelerometer 'none'; ambient-light-sensor 'none'; autoplay 'none'; camera 'none'; encrypted-media 'none'; fullscreen 'none'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; midi 'none'; payment 'none'; picture-in-picture 'none'; sync-xhr 'self' https://haveibeenpwned.com https://twofactorauth.org; usb 'none'; vr 'none'");
+        res.set_raw_header("Referrer-Policy", "same-origin");
+        res.set_raw_header("X-Frame-Options", "SAMEORIGIN");
+        res.set_raw_header("X-Content-Type-Options", "nosniff");
+        res.set_raw_header("X-XSS-Protection", "1; mode=block");
+        let csp = format!(
+            "frame-ancestors 'self' chrome-extension://nngceckbapebfimnlniiiahkandclblb moz-extension://* {};",
+            CONFIG.allowed_iframe_ancestors()
+        );
+        res.set_raw_header("Content-Security-Policy", csp);
 
-            // Disable cache unless otherwise specified
-            if !res.headers().contains("cache-control") {
-                res.set_raw_header("Cache-Control", "no-cache, no-store, max-age=0");
-            }
-        })
+        // Disable cache unless otherwise specified
+        if !res.headers().contains("cache-control") {
+            res.set_raw_header("Cache-Control", "no-cache, no-store, max-age=0");
+        }
     }
 }
 
@@ -59,6 +57,7 @@ impl CORS {
     }
 }
 
+#[rocket::async_trait]
 impl Fairing for CORS {
     fn info(&self) -> Info {
         Info {
@@ -67,31 +66,25 @@ impl Fairing for CORS {
         }
     }
 
-    fn on_response<'a>(
-        &'a self,
-        request: &'a Request<'_>,
-        response: &'a mut Response<'_>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
-        Box::pin(async move {
-            let req_headers = request.headers();
+    async fn on_response<'a>(&'a self, req: &'a Request<'_>, res: &'a mut Response<'_>) {
+        let req_headers = req.headers();
 
-            // We need to explicitly get the Origin header for Access-Control-Allow-Origin
-            let req_allow_origin = CORS::valid_url(CORS::get_header(&req_headers, "Origin"));
+        // We need to explicitly get the Origin header for Access-Control-Allow-Origin
+        let req_allow_origin = CORS::valid_url(CORS::get_header(&req_headers, "Origin"));
 
-            response.set_header(Header::new("Access-Control-Allow-Origin", req_allow_origin));
+        res.set_header(Header::new("Access-Control-Allow-Origin", req_allow_origin));
 
-            if request.method() == Method::Options {
-                let req_allow_headers = CORS::get_header(&req_headers, "Access-Control-Request-Headers");
-                let req_allow_method = CORS::get_header(&req_headers, "Access-Control-Request-Method");
+        if req.method() == Method::Options {
+            let req_allow_headers = CORS::get_header(&req_headers, "Access-Control-Request-Headers");
+            let req_allow_method = CORS::get_header(&req_headers, "Access-Control-Request-Method");
 
-                response.set_header(Header::new("Access-Control-Allow-Methods", req_allow_method));
-                response.set_header(Header::new("Access-Control-Allow-Headers", req_allow_headers));
-                response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
-                response.set_status(Status::Ok);
-                response.set_header(ContentType::Plain);
-                response.set_sized_body(Cursor::new("")).await;
-            }
-        })
+            res.set_header(Header::new("Access-Control-Allow-Methods", req_allow_method));
+            res.set_header(Header::new("Access-Control-Allow-Headers", req_allow_headers));
+            res.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+            res.set_status(Status::Ok);
+            res.set_header(ContentType::Plain);
+            res.set_sized_body(Cursor::new("")).await;
+        }
     }
 }
 
@@ -109,20 +102,12 @@ impl<R> Cached<R> {
     }
 }
 
+#[rocket::async_trait]
 impl<'r, R: 'r + Responder<'r> + Send> Responder<'r> for Cached<R> {
-    fn respond_to(self, req: &'r Request<'_>) -> response::ResultFuture<'r> {
-        use futures::future::FutureExt;
-        let cache_value = self.1;
-
-        self.0
-            .respond_to(req)
-            .then(move |res| async move {
-                res.and_then(|mut r| {
-                    r.set_raw_header("Cache-Control", cache_value);
-                    Ok(r)
-                })
-            })
-            .boxed()
+    async fn respond_to(self, request: &'r Request<'_>) -> response::Result<'r> {
+        let mut res = self.0.respond_to(request).await?;
+        res.set_raw_header("Cache-Control", self.1);
+        Ok(res)
     }
 }
 
@@ -139,6 +124,7 @@ const LOGGED_ROUTES: [&str; 6] = [
 
 // Boolean is extra debug, when true, we ignore the whitelist above and also print the mounts
 pub struct BetterLogging(pub bool);
+#[rocket::async_trait]
 impl Fairing for BetterLogging {
     fn info(&self) -> Info {
         Info {
@@ -167,46 +153,34 @@ impl Fairing for BetterLogging {
         info!(target: "start", "Rocket has launched from {}", addr);
     }
 
-    fn on_request<'a>(
-        &'a self,
-        request: &'a mut Request<'_>,
-        _: &'a Data,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
-        Box::pin(async move {
-            let method = request.method();
-            if !self.0 && method == Method::Options {
-                return;
-            }
-            let uri = request.uri();
-            let uri_path = uri.path();
-            if self.0 || LOGGED_ROUTES.iter().any(|r| uri_path.starts_with(r)) {
-                match uri.query() {
-                    Some(q) => info!(target: "request", "{} {}?{}", method, uri_path, &q[..q.len().min(30)]),
-                    None => info!(target: "request", "{} {}", method, uri_path),
-                };
-            }
-        })
+    async fn on_request<'a>(&'a self, req: &'a mut Request<'_>, _data: &'a Data) {
+        let method = req.method();
+        if !self.0 && method == Method::Options {
+            return;
+        }
+        let uri = req.uri();
+        let uri_path = uri.path();
+        if self.0 || LOGGED_ROUTES.iter().any(|r| uri_path.starts_with(r)) {
+            match uri.query() {
+                Some(q) => info!(target: "request", "{} {}?{}", method, uri_path, &q[..q.len().min(30)]),
+                None => info!(target: "request", "{} {}", method, uri_path),
+            };
+        }
     }
 
-    fn on_response<'a>(
-        &'a self,
-        request: &'a Request<'_>,
-        response: &'a mut Response<'_>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
-        Box::pin(async move {
-            if !self.0 && request.method() == Method::Options {
-                return;
+    async fn on_response<'a>(&'a self, req: &'a Request<'_>, res: &'a mut Response<'_>) {
+        if !self.0 && req.method() == Method::Options {
+            return;
+        }
+        let uri_path = req.uri().path();
+        if self.0 || LOGGED_ROUTES.iter().any(|r| uri_path.starts_with(r)) {
+            let status = res.status();
+            if let Some(ref route) = req.route() {
+                info!(target: "response", "{} => {} {}", route, status.code, status.reason)
+            } else {
+                info!(target: "response", "{} {}", status.code, status.reason)
             }
-            let uri_path = request.uri().path();
-            if self.0 || LOGGED_ROUTES.iter().any(|r| uri_path.starts_with(r)) {
-                let status = response.status();
-                if let Some(ref route) = request.route() {
-                    info!(target: "response", "{} => {} {}", route, status.code, status.reason)
-                } else {
-                    info!(target: "response", "{} {}", status.code, status.reason)
-                }
-            }
-        })
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use diesel::r2d2::ConnectionManager;
 use diesel::{Connection as DieselConnection, ConnectionError};
 
 use rocket::http::Status;
-use rocket::request::{self, FromRequestAsync};
+use rocket::request::{self, FromRequest};
 use rocket::{Outcome, Request, State};
 
 use crate::error::Error;
@@ -72,21 +72,20 @@ pub fn backup_database() -> Result<(), Error> {
 /// Attempts to retrieve a single connection from the managed database pool. If
 /// no pool is currently managed, fails with an `InternalServerError` status. If
 /// no connections are available, fails with a `ServiceUnavailable` status.
-impl<'a, 'r> FromRequestAsync<'a, 'r> for DbConn {
+#[rocket::async_trait]
+impl<'a, 'r> FromRequest<'a, 'r> for DbConn {
     type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
-        Box::pin(async move {
-            let pool = try_outcome!(request.guard::<State<Pool>>()).clone();
-            
-            // TODO: We are basically doing the same as rocket's #[database(name)] macro, maybe we should just use that?
-            tokio::task::spawn_blocking(move || {
-                match pool.get() {
-                    Ok(conn) => Outcome::Success(DbConn(conn)),
-                    Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
-                }
-            }).await.expect("failed to spawn a blocking task to get a pooled connection")
+    async fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+        let pool: Pool = try_outcome!(request.guard::<State<Pool>>().await).clone();
+
+        // TODO: We are basically doing the same as rocket's #[database(name)] macro, maybe we should just use that?
+        tokio::task::spawn_blocking(move || match pool.get() {
+            Ok(conn) => Outcome::Success(DbConn(conn)),
+            Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
         })
+        .await
+        .expect("failed to spawn a blocking task to get a pooled connection")
     }
 }
 
